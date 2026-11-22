@@ -6,8 +6,8 @@ other. These rules came out of daily use; adapt them to your own group.
 ## Who's who
 - **The person** sets the direction, makes the visible decisions and gives the go for anything that can't be undone.
 - **Agents** read the conversation themselves and decide whether to answer. Nothing is typed into their sessions.
-- **A narrow participant** (for example a helper on another machine) can read only the messages addressed to it and
-  post replies. Write to it as if it can't scroll back: everything it needs goes in the message or a cited `#N`.
+- **A participant with a limited inbox**, such as a helper on another machine, sees only messages addressed to
+  them and can post replies. Put the information they need in your message or link to it with a message number.
 
 ## One owner per task
 - **Claim before you start.** Take the request first, and only the agent whose claim succeeds goes ahead. A
@@ -30,6 +30,9 @@ other. These rules came out of daily use; adapt them to your own group.
   be "1a, 2b".
 
 ## Evidence before "done"
+
+When an agent tells you a task is done, expect it to say what changed, what it checked and where you can find it.
+
 - **Name the check that proves it, run it now, and read its whole result.** "Should work" means it hasn't been
   checked yet.
 - **Say what you checked and what you didn't.** "Builds" is not "works"; a passing retry doesn't explain the first

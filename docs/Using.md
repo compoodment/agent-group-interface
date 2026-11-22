@@ -1,7 +1,7 @@
 # Using the chat screen
 
-Start the chat with `bin/agi` in a terminal. `?` on an empty line shows the keys, and stays as text if you keep
-typing. Below 30 × 8 the screen asks for a larger terminal.
+Run `agi` in a terminal to open the chat. Type `?` in an empty message box to see the keyboard shortcuts. If you
+keep typing, AGI treats the `?` as part of your message. Use a terminal at least 30 columns wide and 8 rows tall.
 
 ## Writing and sending
 - Enter sends. Shift+Enter (or Ctrl+J, Alt+Enter) starts a new line, and a multi-line paste stays in the box
@@ -10,9 +10,9 @@ typing. Below 30 × 8 the screen asks for a larger terminal.
 - Ctrl+V pastes the clipboard's text at the cursor, or attaches its image; an image file dropped on the terminal is attached too (up to four
   per message). They show above the draft, Backspace at its start removes the last, and in the chat each is a
   link that opens it full size.
-- Over SSH, Shift+Enter works when the terminal reports modified keys, which the screen asks for
-  (`AGI_KEYS=legacy` stops asking). In a local X session it also checks whether Shift is held
-  (`AGI_SHIFT_ENTER=0` stops that).
+- If Shift+Enter does not insert a new line, use Ctrl+J. Over SSH, Shift+Enter needs a terminal that reports
+  the Shift key with Enter. `AGI_KEYS=legacy` stops AGI asking the terminal for this. In a local X11 session,
+  AGI can check the Shift key directly. `AGI_SHIFT_ENTER=0` disables that check.
 - What you're typing is saved as you go, so after a crash or power cut the next `agi` restores it.
 - Sending keeps you where you're reading; it doesn't scroll to the bottom.
 
@@ -29,9 +29,9 @@ typing. Below 30 × 8 the screen asks for a larger terminal.
 - A normal exit saves the message at the top of the screen. Reopen AGI to
   return there. If you left at the latest message, AGI opens at the latest again.
 - The touchpad or wheel scrolls the chat; PageUp and PageDown move half a screen. Esc goes back to the latest.
-- Click any `#number` in a message (or a quoted `↪ #N` line) to go to that message; an older one opens a history
-  view. Tab goes back to where you were before the jump, a step at a time, with or without text in the box (where
-  the cursor isn't on an @name or /command for Tab to fill in).
+- Click any `#number` or a quoted `↪ #N` line to go to that message. AGI opens a history view if the message is
+  older. Press Tab to go back one jump at a time. If the cursor is on an `@name` or `/command`, Tab fills it in
+  instead.
 - `/find words` jumps to the newest message containing them, its words highlighted until Esc, and lists older
   matches under the note. A bare `/find` repeats the search for older ones. `/find from:codex` (or another
   sender's name) lists that sender's messages and doesn't jump.
@@ -41,12 +41,13 @@ typing. Below 30 × 8 the screen asks for a larger terminal.
 - `/catchup` shows what is waiting for you since you last read: questions marked with choices that nobody has
   answered, to-dos waiting on you and replies to you. Then it shows what finished and what is in hand. It says how
   many other messages stay unread, and it marks nothing as read.
-- A link shows its words underlined with ↗; clicking it opens it (a web page in the browser, a file or folder
-  inside your home in its usual app). A program never runs; `AGI_LINK_ROOT` changes where links may point.
+- Click an underlined link with ↗ to open a web page in your browser or a file or folder in its usual app. AGI
+  opens local links only inside your home folder and refuses links to executables and desktop launchers. Set
+  `AGI_LINK_ROOT` before starting AGI to use a different folder for local links.
 - Drag over the chat to select words, then Ctrl+C copies them as written: wrapped lines joined back, without names,
   times or marks; it stays on the clipboard after AGI closes. Esc clears the selection, and Ctrl+C with none still
   quits. The terminal's own selection is Shift+drag (`/mouse off` gives it back fully, `AGI_MOUSE=0` starts that way).
-- Messages that mention you (`@user`, `@you` or `@all`, not inside code or a quote) get a green bar
+- Replies to your messages and mentions of you (`@user`, `@you` or `@all` outside code and quotes) get a green bar
   and a beep. If the window isn't focused, a desktop notification pops up with a soft sound (`AGI_NOTIFY=0` turns
   both off). `/sound away` is that default; `/sound always` also plays it while AGI is in front, `/sound off`
   silences it; the choice is remembered. The sound is the desktop's "new message" one, played with `paplay`. Every
@@ -62,8 +63,8 @@ typing. Below 30 × 8 the screen asks for a larger terminal.
 - Either way, only what is true: **working** (its own turn is running; its task and for how long), **waiting · #N**
   (holds a task between turns), **idle** (reachable, nothing held), **away** or **left** (it left the chat by
   choice; see `/leave` below).
-- Your messages and mentions carry a quiet mark per recipient: a dot in its colour once delivered, its check once
-  acked. `/tasks`, `/gates` and `/who` list the details.
+- A coloured dot beside your message means that agent's session received it. A check appears when the agent has
+  marked it handled. `/who` shows the connection details for each agent.
 - The admin session posts as **● admin** and sees messages that say **@admin**, and your replies to its own posts.
 
 ## What's promised for later
@@ -80,10 +81,11 @@ typing. Below 30 × 8 the screen asks for a larger terminal.
 ## Commands
 Type `/` to find a command by name or by a word like `search`. ↑/↓ choose, Tab fills in, Esc hides the list,
 Enter runs a complete command. A space after commands such as `/mode` shows their choices.
-- `/connect` shows each installed client's setup. Run `/connect claude` or `/connect codex` to set it up for the
-  open conversation. If the client points at another chat, AGI shows its folder and asks before changing it.
-- `/who` shows each agent's connection and what to do if delivery stalls. `/who test claude` sends one test to
-  the joined Claude session. Run `/who` again to see whether it answered.
+- `/connect` shows which programs are set up for AGI. Type `/connect claude` or `/connect codex` to save this
+  chat's location in that program's settings. If it already points to another chat, AGI shows the folder and
+  asks before changing it.
+- `/who` shows whether each agent can receive your messages and how to reconnect it. `/who test claude` sends
+  one test to the joined Claude session. Run `/who` again to see whether it answered.
 - `/settings` is one list: the mention sound, desktop notifications, whether the mouse scrolls the chat and the
   agents' posting rate. ↑ ↓ choose a row and Enter changes it at once. It also shows the chat folder. The separate
   commands (`/sound`, `/mouse`, `/mode`, `/pause`) still work.
@@ -94,12 +96,13 @@ Enter runs a complete command. A space after commands such as `/mode` shows thei
   `/leave codex` stops delivering it; the agent's claims stay. If another session of the same agent asks to join,
   the note line asks whether to move it there (Enter yes, Esc no). The sidebar shows **left** for an agent that
   left this way.
-- `/unclaim #N` takes an agent's claim off request N. It shows whose claim it is and what they were doing, and asks
-  yes or no first (Enter yes, Esc no). The former owner receives a notice.
-- `/custom 10 1 60` allows ten agent messages per rolling minute for sixty minutes; `/custom 4 1`, without the
-  last number, keeps four per minute until you change it. `/custom off` returns to normal: five per rolling minute,
-  shared by both agents.
-- `/mode wait` selects the user-reset guard; `/pause` pauses agent posts until `/resume`.
+- A claim shows which agent owns a request. `/unclaim #N` removes that claim. AGI shows who's working on it and
+  asks first. Press Enter to remove it or Esc to keep it. The former owner receives a notice.
+- `/custom 10 1 60` allows ten agent messages within any one-minute window for the next 60 minutes. The numbers
+  set the message limit, window in minutes, and duration in minutes. `/custom 4 1` keeps four messages per minute
+  until you change it. `/custom off` returns to the shared limit of five per minute.
+- `/mode wait` lets agents post four messages in total, then makes them wait until you send another message.
+  `/pause` stops agents posting until you type `/resume`.
 - `/export` (or `/export 300-404`) saves Markdown to `exports/` beside the chat's data folder
   (`AGI_EXPORTS` changes it).
 - `/decisions` lists your answers to questions an agent marked with choices (1a, 1b, …), newest first: the

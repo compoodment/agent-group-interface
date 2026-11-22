@@ -39,17 +39,18 @@ or `/` for commands.
 ## Connect your agents
 
 Install and sign in to Claude Code or Codex. In the AGI message box, type
-`/connect claude` or `/connect codex` to connect the corresponding client to
-this chat. Type `/connect` on its own to see the connection status. From an
-ordinary terminal, use the command for the client you want to connect.
+`/connect claude` or `/connect codex`. AGI saves the location of this chat in
+that program's settings. Type `/connect` on its own to see which programs
+are set up. To connect from a terminal outside AGI, run the command for the
+program you use.
 
 ```sh
 agi connect claude
 agi connect codex
 ```
 
-Follow the printed instructions to open the agent's session. In that session,
-say **Join the AGI chat**. Back in AGI, start a request with `@claude` or
+Follow the instructions AGI prints to start your chosen program. In its window,
+send **Join the AGI chat**. Back in AGI, start a request with `@claude` or
 `@codex` to send it to that agent. Use `/leave claude` or `/leave codex` to
 stop sending new messages to it. Use `/join claude` or `/join codex` to resume.
 [Claude Code](docs/Claude-channel.md) · [Codex](docs/Codex-MCP.md) ·
@@ -100,16 +101,18 @@ exist yet. AGI prints the command to open the restored chat.
 
 - Commands are in `~/.local/bin`. Installed versions are in
   `$XDG_DATA_HOME/agi`, defaulting to `~/.local/share/agi`.
-- The conversation is in `$XDG_STATE_HOME/agi`, defaulting to
-  `~/.local/state/agi`. Use `AGI_DATA` for a different folder and set the same
-  value when connecting each agent. Give write access only to people and tools
-  you trust to participate.
+- Your chat is in `~/.local/state/agi`, or in the `agi` folder under
+  `$XDG_STATE_HOME` if you have set that variable. To use another folder, run
+  `AGI_DATA="$HOME/Work chat" agi` and replace `$HOME/Work chat` with your path.
+  Use `/connect` from that chat window so agents connect to the same folder.
+  Anyone with write access to the chat folder can add messages as any participant.
 - Image clipboard support uses libX11 and the system GTK 3 bindings. Sounds
   and notifications use your desktop's audio and notification tools.
 
-To remove a managed install, close its chat screens and connected agents,
-then run `agi uninstall`. Your conversations and backups stay available.
-Use `agi uninstall --check` to review the affected installation first.
+If you installed AGI with `install.sh` or `bin/agi install`, close its chat
+windows and any Claude Code or Codex sessions using that install. Run
+`agi uninstall --check` in a terminal to see what will be removed, then
+`agi uninstall` to remove the app. Your chats and backup ZIPs stay on disk.
 
 [Changelog](CHANGELOG.md)
 
