@@ -1,6 +1,6 @@
-"""Independent end-to-end recovery check. Run: python3 tests/recovery_probe.py bin/chat.
+"""Independent end-to-end recovery check. Run: python3 tests/recovery_probe.py bin/agi.
 
-Real UI, isolated temporary data, deliberate SIGKILL of test children only. Not a hardware power cut.
+Real UI, isolated Storage data, deliberate SIGKILL of test children only. Not a hardware power cut.
 """
 import argparse
 import json
@@ -28,7 +28,7 @@ def marker(root):
 
 
 def chat(launcher,root,*args):
-    result=subprocess.run([str(launcher),*args],env=dict(os.environ,AGENTCHAT_DATA=str(root)),
+    result=subprocess.run([str(launcher),*args],env=dict(os.environ,AGI_DATA=str(root)),
                           capture_output=True,text=True,check=True,timeout=10)
     return json.loads(result.stdout)
 
@@ -36,14 +36,14 @@ def chat(launcher,root,*args):
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('launcher',type=Path);args=parser.parse_args()
     launcher=args.launcher.resolve();results={}
-    with tempfile.TemporaryDirectory(prefix='agentchat-recovery-') as directory:
+    with tempfile.TemporaryDirectory(prefix='agi-recovery-',dir=os.environ.get('AGI_SCRATCH')) as directory:
         root=Path(directory);first=second=third=None
         try:
             first=Probe(launcher,root)
             prefix='Please review:\n';payload='    '+'x'*1200+'\n        last line'
             first.send(b'Please review:\n')
             first.send(b'\x1b[200~'+payload.encode()+b'\x1b[201~')
-            first.send(b'\x01')                 # cursor at the start of the chip's logical line
+            first.send(b'\x01')                 # move left to the chip's logical line boundary
             def saved():
                 for path in (root/'ui/drafts').glob('*.json'):
                     value=json.loads(path.read_text())
@@ -68,10 +68,10 @@ def main():
                 if probe:probe.close()
     # Deliberately exit at each side of the actual UI append, after its intent is saved.
     for committed in (False, True):
-        with tempfile.TemporaryDirectory(prefix='agentchat-send-boundary-') as directory:
+        with tempfile.TemporaryDirectory(prefix='agi-send-boundary-',dir=os.environ.get('AGI_SCRATCH')) as directory:
             root=Path(directory);data=root/'data';data.mkdir()
             wrapper=root/'crash-chat'
-            wrapper.write_text("#!/usr/bin/python3\nimport sys, os\nsys.path.insert(0, "+repr(str(launcher.parent.parent))+")\nfrom agentchat import store\noriginal=store.append_message\ndef crash(*args, **kwargs):\n    "+("original(*args, **kwargs)" if committed else "pass")+"\n    os._exit(0)\nstore.append_message=crash\nfrom agentchat.cli import main\nmain()\n")
+            wrapper.write_text("#!/usr/bin/python3\nimport sys, os\nsys.path.insert(0, "+repr(str(launcher.parent.parent))+")\nfrom agi import store\noriginal=store.append_message\ndef crash(*args, **kwargs):\n    "+("original(*args, **kwargs)" if committed else "pass")+"\n    os._exit(0)\nstore.append_message=crash\nfrom agi.cli import main\nmain()\n")
             wrapper.chmod(0o700)
             probe=Probe(wrapper,data)
             try:
@@ -89,7 +89,7 @@ def main():
                 expected=['boundary intent','fresh after commit'] if committed else ['boundary intent']
                 results[f'boundary_{committed}_exactly_once']=[m['text'] for m in records]==expected
             finally:probe.close()
-    with tempfile.TemporaryDirectory(prefix='agentchat-read-marker-') as directory:
+    with tempfile.TemporaryDirectory(prefix='agi-read-marker-',dir=os.environ.get('AGI_SCRATCH')) as directory:
         root=Path(directory);probe=Probe(launcher,root)
         try:
             one=chat(launcher,root,'say','--from','codex','@user first background message')
@@ -108,7 +108,7 @@ def main():
         terminal=Terminal(24,80)
         terminal.feed(bytes(probe.output).decode('utf-8','replace'))
         return terminal.text()
-    with tempfile.TemporaryDirectory(prefix='agentchat-history-review-') as directory:
+    with tempfile.TemporaryDirectory(prefix='agi-history-review-',dir=os.environ.get('AGI_SCRATCH')) as directory:
         root=Path(directory);(root/'chat').mkdir()
         with (root/'chat/2026-11-16.jsonl').open('w') as stream:
             for number in range(1,2001):

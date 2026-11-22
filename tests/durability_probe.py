@@ -1,11 +1,12 @@
-"""Interrupt actual UI sends inside append; isolated temporary fixtures, never live data.
+"""Interrupt actual UI sends inside append; isolated Storage fixtures, never live data.
 
-Run: python3 tests/durability_probe.py bin/chat. Process exits simulate software interruption,
+Run: python3 tests/durability_probe.py bin/agi. Process exits simulate software interruption,
 not loss of USB power or filesystem caches. Each failed child exits with code 86.
 """
 import argparse
 import json
 from pathlib import Path
+import os
 import tempfile
 
 from terminal_probe import Probe
@@ -14,7 +15,7 @@ from terminal_probe import Probe
 INJECTOR = '''#!/usr/bin/python3
 import os, sys
 sys.path.insert(0, ROOT)
-from agentchat import store
+from agi import store
 stage = STAGE
 original_write, original_sync = os.write, os.fsync
 original_directory, original_atomic = store._sync_directory, store._atomic_write
@@ -63,7 +64,7 @@ def atomic(path, data):
 
 os.write, os.fsync = write, sync
 store._sync_directory, store._atomic_write = directory, atomic
-from agentchat.cli import main
+from agi.cli import main
 main()
 '''
 
@@ -77,7 +78,8 @@ def main():
     stages = ('before_write', 'partial_write', 'before_fsync', 'after_fsync',
               'after_directory', 'before_sequence', 'after_sequence')
     for stage in stages:
-        with tempfile.TemporaryDirectory(prefix='agentchat-durability-') as directory:
+        with tempfile.TemporaryDirectory(prefix='agi-durability-',
+                dir=os.environ.get('AGI_SCRATCH')) as directory:
             root = Path(directory)
             data = root / 'data'
             data.mkdir()

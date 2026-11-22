@@ -31,7 +31,7 @@ def run(path, name, count):
     assert len(messages) == count
     tail_module = load(path, name + '_tail')
     started = time.perf_counter()
-    tail = tail_module.read_recent(min(1000, count))
+    tail = tail_module.read_tail(min(1000, count))
     tail_ms = (time.perf_counter() - started) * 1000
     assert len(tail) == min(1000, count) and tail[-1]['id'] == count
     return {'cold_tail_ms': round(tail_ms, 3), 'cold_ms': round(cold * 1000, 3),
@@ -43,11 +43,11 @@ def main():
     parser.add_argument('--baseline', type=Path, required=True)
     parser.add_argument('--autonomous', action='store_true', help='Use mixed agent history and autonomous mode')
     args = parser.parse_args()
-    candidate = Path(__file__).resolve().parents[1]/'agentchat/store.py'
+    candidate = Path(__file__).resolve().parents[1]/'agi/store.py'
     results = {}
     for count in (1000, 20000):
-        with tempfile.TemporaryDirectory(prefix='agentchat-bench-') as directory:
-            os.environ['AGENTCHAT_DATA'] = directory
+        with tempfile.TemporaryDirectory(prefix='agi-bench-', dir=os.environ.get('AGI_SCRATCH')) as directory:
+            os.environ['AGI_DATA'] = directory
             chat = Path(directory)/'chat'
             chat.mkdir()
             with (chat/'2026-11-16.jsonl').open('w') as stream:

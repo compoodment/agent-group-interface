@@ -1,6 +1,6 @@
 """Focused investigation of the intermittent large-chip send; isolated real PTYs.
 
-Run: python3 tests/paste_stress.py bin/chat --rounds 30 --store-load.
+Run: python3 tests/paste_stress.py bin/agi --rounds 30 --store-load.
 Prints exact write sizes and timings; saves failed fixture/terminal/trace evidence to --report.
 """
 import argparse
@@ -21,12 +21,12 @@ def write_traced_launcher(path,repo):
     path.write_text('''#!/usr/bin/python3
 import json,os,sys,time,signal,faulthandler
 sys.path.insert(0, ROOT)
-from agentchat import store
-from agentchat.ui import Screen
+from agi import store
+from agi.ui import Screen
 store._prepare()
-trace=open(os.path.join(os.environ['AGENTCHAT_DATA'],'input-trace.jsonl'),'w',buffering=1)
+trace=open(os.path.join(os.environ['AGI_DATA'],'input-trace.jsonl'),'w',buffering=1)
 def record(event,**fields):trace.write(json.dumps(dict(event=event,at=time.monotonic(),**fields))+'\\n')
-stack=open(os.path.join(os.environ['AGENTCHAT_DATA'],'stacks.txt'),'w')
+stack=open(os.path.join(os.environ['AGI_DATA'],'stacks.txt'),'w')
 faulthandler.register(signal.SIGUSR1,file=stack,all_threads=True)
 original=Screen.handle_pending
 def pending(self):
@@ -52,7 +52,7 @@ def timed_atomic(path,data):
  try:return atomic(path,data)
  finally:record('atomic',file=str(path.relative_to(store.DATA_DIR)),elapsed=time.monotonic()-started)
 store._atomic_write=timed_atomic
-from agentchat.cli import main
+from agi.cli import main
 main()
 '''.replace('ROOT',repr(str(repo))))
     path.chmod(0o700)
@@ -70,7 +70,7 @@ def main():
     Terminal=runpy.run_path(str(Path(__file__).with_name('test_ui.py')))['Terminal']
     payload='\n'.join(f'line {n} '+'x'*60 for n in range(200))
     results=[];load=None;load_codes=[]
-    with tempfile.TemporaryDirectory(prefix='agentchat-paste-stress-') as directory:
+    with tempfile.TemporaryDirectory(prefix='agi-paste-stress-',dir=os.environ.get('AGI_SCRATCH')) as directory:
         root=Path(directory);wrapper=root/'traced-chat'
         write_traced_launcher(wrapper,repo)
         with (root/'store-load.txt').open('w+') as load_output:

@@ -1,10 +1,9 @@
-# AgentChat contributors
-Read README.md first, then docs/CONTRACT.md before changing interfaces.
-- Post only as yourself; never impersonate user or system.
-- Claim a user task before starting it and acknowledge only handled messages.
-- Respect posting-policy refusals; never evade them with another sender or kind.
-- Coordinate shared files and use separate worktrees for concurrent edits.
-- Test with isolated data, never a live conversation.
-- Keep runtime data, credentials and local machine configuration out of git.
-- Update documentation alongside behavior changes.
-Maintained by the AgentChat contributors.
+# AGI contributors
+
+Read [README.md](README.md), the [joining guide](docs/Joining.md), and the
+[data and command contract](docs/CONTRACT.md).
+
+- Use disposable directories for tests and never edit live chat data by hand.
+- Post as yourself through AGI. Confirm requests and claims before starting work.
+- Run the Python test suite and terminal probe before merging a change.
+- Keep deployment-specific configuration and conversation data out of Git.

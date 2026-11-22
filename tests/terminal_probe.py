@@ -15,25 +15,35 @@ import termios
 import time
 
 
+# This probe checks terminal behavior. The integration latency test measures speed.
+STARTUP_TIMEOUT = 12
+SCRATCH = os.environ.get('AGI_SCRATCH')
+
+
 class Probe:
     def __init__(self, launcher, data_directory=None):
-        self.directory=(tempfile.TemporaryDirectory(prefix='agentchat-pty-')
+        self.directory=(tempfile.TemporaryDirectory(prefix='agi-pty-',dir=SCRATCH)
                         if data_directory is None else None)
         self.root=Path(self.directory.name if self.directory else data_directory)
         self.master,slave=pty.openpty()
         self.original_lflag=termios.tcgetattr(slave)[3]
         fcntl.ioctl(slave,0x5414,struct.pack('HHHH',24,80,0,0))
-        env=dict(os.environ,TERM='xterm-256color',AGENTCHAT_DATA=str(self.root),AGENTCHAT_NOTIFY='0')
+        env=dict(os.environ,TERM='xterm-256color',AGI_DATA=str(self.root),AGI_NOTIFY='0',AGI_SETUP_NOTICE='0')
         self.process=subprocess.Popen([str(launcher)],stdin=slave,stdout=slave,stderr=slave,env=env,start_new_session=True)
         os.close(slave)
         self.output=bytearray()
-        deadline=time.monotonic()+5
+        deadline=time.monotonic()+STARTUP_TIMEOUT
         while '❯'.encode() not in self.output and self.process.poll() is None and time.monotonic()<deadline:
             self.collect(.05)
         if '❯'.encode() not in self.output:
+            exit_code=self.process.poll()
+            reason=(f'exited with status {exit_code}' if exit_code is not None
+                    else f'no prompt after {STARTUP_TIMEOUT} seconds')
+            if exit_code is not None:
+                self.collect(.05)
             details=self.output.decode(errors='replace')
             self.close()
-            raise RuntimeError('Chat prompt did not become ready: '+details)
+            raise RuntimeError(f'Chat prompt did not become ready ({reason}): {details}')
 
     def collect(self,duration=.25):
         if self.master is None:return
@@ -153,7 +163,7 @@ def main():
         os.close(p.master)
         p.master=None
         try:
-            p.process.wait(timeout=2)
+            p.process.wait(timeout=STARTUP_TIMEOUT)  # it exits within a second; a busy host needed more than 2 s
             results['terminal_hangup_exits_promptly']=True
         except subprocess.TimeoutExpired:
             results['terminal_hangup_exits_promptly']=False

@@ -1,4 +1,0 @@
-#!/bin/sh
-# A local stdio tool adapter; no network listener or model session is started.
-ROOT=$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)
-PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}" exec python3 -P -m agentchat.codex_mcp "$@"

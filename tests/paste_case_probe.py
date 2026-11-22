@@ -76,10 +76,10 @@ def main():
             original_teardown(self)
     base.tearDown=teardown
     results=[];load=None;codes=[]
-    with tempfile.TemporaryDirectory(prefix='agentchat-exact-paste-') as directory:
+    with tempfile.TemporaryDirectory(prefix='agi-exact-paste-',dir=os.environ.get('AGI_SCRATCH')) as directory:
         root=Path(directory);wrapper=root/'traced-chat';write_traced_launcher(wrapper,repo)
         if args.minimal_trace:
-            wrapper.write_text('#!/usr/bin/python3\nimport sys,os,signal,faulthandler\nsys.path.insert(0,'+repr(str(repo))+')\nfrom agentchat import store\nstore._prepare()\nstack=open(os.path.join(os.environ["AGENTCHAT_DATA"],"stacks.txt"),"w")\nfaulthandler.register(signal.SIGUSR1,file=stack,all_threads=True)\nfrom agentchat.cli import main\nmain()\n')
+            wrapper.write_text('#!/usr/bin/python3\nimport sys,os,signal,faulthandler\nsys.path.insert(0,'+repr(str(repo))+')\nfrom agi import store\nstore._prepare()\nstack=open(os.path.join(os.environ["AGI_DATA"],"stacks.txt"),"w")\nfaulthandler.register(signal.SIGUSR1,file=stack,all_threads=True)\nfrom agi.cli import main\nmain()\n')
         original_init.__globals__['LAUNCHER']=str(args.launcher.resolve() if args.unmodified else wrapper)
         with (root/'load.txt').open('w+') as loadout:
             try:

@@ -1,7 +1,9 @@
 """Isolated Unix native endpoint and queue executable; never invokes an installed agent."""
 import base64
+from contextlib import contextmanager
 import hashlib
 import json
+import os
 from pathlib import Path
 import socket
 import struct
@@ -9,13 +11,24 @@ import sys
 import threading
 
 
+@contextmanager
+def socket_address(directory, name):
+    """Keep the socket in scratch while giving local child processes a short address."""
+    descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        yield Path(f'/proc/{os.getpid()}/fd/{descriptor}') / name
+    finally:
+        os.close(descriptor)
+
+
 class NativeFixture:
-    def __init__(self, directory, thread):
+    def __init__(self, directory, thread, socket_path):
         self.root, self.thread = Path(directory), thread
-        self.path = self.root / 'native.sock'
+        self.path = socket_path
         self.active = self.root / 'native-active'
         self.queue_log = self.root / 'queue.jsonl'
-        self.errors, self.reads = [], []
+        self.errors, self.reads, self.deleted = [], [], []
+        self.refreshes = 0
         self.stopped = threading.Event()
         self.server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.server.bind(str(self.path)); self.server.listen(); self.server.settimeout(.1)
@@ -90,6 +103,21 @@ with (root / 'queue.jsonl').open('a') as output:
                     raise ValueError('wrong session or non-metadata request')
                 self.reads.append('active' if self.active.exists() else 'idle')
                 result = dict(thread=dict(id=self.thread,status=dict(type=self.reads[-1])))
+            elif request['method'] == 'config/mcpServer/reload' and request['params'] == {}:
+                self.refreshes += 1
+                result = {}
+            elif request['method'] == 'thread/queue/list':
+                if request['params']['threadId'] != self.thread:
+                    raise ValueError('wrong queue session')
+                rows = [dict(id=str(number), input=[dict(type='text', text=args[args.index('--message') + 1])])
+                        for number, args in enumerate(self.queues(), 1) if str(number) not in self.deleted]
+                rows.append(dict(id='unrelated', input=[dict(type='text', text='A manually queued message.')]))
+                result = dict(data=rows, nextCursor=None)
+            elif request['method'] == 'thread/queue/delete':
+                if request['params']['threadId'] != self.thread:
+                    raise ValueError('wrong queue session')
+                self.deleted.append(request['params']['queuedSubmissionId'])
+                result = dict(deleted=True)
             else: raise ValueError('unexpected native method')
             data = json.dumps(dict(id=request['id'],result=result)).encode()
             head = bytes((129,len(data))) if len(data)<126 else bytes((129,126))+struct.pack('!H',len(data))

@@ -1,8 +1,6 @@
 __pycache__/
 *.pyc
-# Runtime state and local configuration must not enter source control.
+# Runtime data lives outside the repo (../data); never commit it here either.
 data/
 *.jsonl
-.env
-.env.*
-*.log
+.~lock.*#

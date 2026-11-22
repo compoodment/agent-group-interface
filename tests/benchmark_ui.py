@@ -1,6 +1,6 @@
 """Observed UI readiness, verified key echo and idle resources; synthetic data only.
 
-Run: python3 tests/benchmark_ui.py bin/chat --history 5000 --idle-seconds 10.
+Run: python3 tests/benchmark_ui.py bin/agi --history 5000 --idle-seconds 10.
 Includes PTY/test-emulator overhead; not a direct renderer timing or a cold-disk benchmark.
 """
 import argparse
@@ -32,7 +32,7 @@ def main():
     args=parser.parse_args()
     if args.history<0 or not 1<=args.idle_seconds<=60:parser.error('history >= 0; idle seconds from 1 to 60')
     Terminal=runpy.run_path(str(Path(__file__).with_name('test_ui.py')))['Terminal']
-    with tempfile.TemporaryDirectory(prefix='agentchat-ui-bench-') as directory:
+    with tempfile.TemporaryDirectory(prefix='agi-ui-bench-',dir=os.environ.get('AGI_SCRATCH')) as directory:
         root=Path(directory);(root/'chat').mkdir()
         with (root/'chat/2026-11-16.jsonl').open('w') as stream:
             for number in range(1,args.history+1):

@@ -12,14 +12,19 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRATCH = os.environ.get('AGI_SCRATCH')
 sys.path.insert(0, str(ROOT))
-from agentchat import codex_mcp, store
+from agi import codex_mcp, store
+
+
+TOOL_NAMES = {"chat_read", "chat_post", "chat_ack", "chat_release_notes", "chat_task",
+              "chat_task_evidence", "chat_status"}
 
 
 class MCPTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix='agentchat-mcp-')
-        self.env = patch.dict(os.environ, AGENTCHAT_DATA=self.temp.name)
+        self.temp = tempfile.TemporaryDirectory(prefix='agi-mcp-', dir=SCRATCH)
+        self.env = patch.dict(os.environ, AGI_DATA=self.temp.name)
         self.env.start();importlib.reload(store)
         self.server = codex_mcp.Server('codex', io.StringIO())
 
@@ -47,15 +52,58 @@ class MCPTests(unittest.TestCase):
 
     def test_sender_bound_guard_claims_and_tasks_match_store(self):
         request = store.append_message('user','please work')
-        self.server.call('chat_task',{'action':'take','id':request['id']})
+        self.server.call('chat_task',{'action':'take','id':request['id'],'doing':'Checking the release'})
+        self.assertEqual(store.list_tasks()[0]['doing'], 'Checking the release')
+        self.server.call('chat_task',{'action':'doing','id':request['id'],'doing':'Verifying the download'})
+        self.assertEqual(store.list_tasks()[0]['doing'], 'Verifying the download')
         with self.assertRaises(store.ClaimConflict):store.take_task('claude',request['id'])
-        self.server.call('chat_task',{'action':'release','id':request['id']})
-        self.server.call('chat_post',{'text':'agentchat','kind':'claim'})
-        with self.assertRaises(store.ClaimConflict):store.append_message('claude','agentchat/ui','claim')
-        self.server.call('chat_post',{'text':'agentchat','kind':'release'})
-        for i in range(4):self.assertEqual(self.server.call('chat_post',{'text':str(i)})['sender'],'codex')
+        args = dict(action='release', id=request['id'], result='Checked the candidate', check='Manual download check')
+        with self.assertRaisesRegex(ValueError, 'requires skills'):
+            self.server.call('chat_task', args)
+        with self.assertRaisesRegex(ValueError, 'because'):
+            self.server.call('chat_task', dict(args, skills='none'))
+        with self.assertRaisesRegex(ValueError, 'record the task'):
+            self.server.call('chat_post', dict(text=f"task:{request['id']}", kind='release'))
+        self.assertEqual(store.list_tasks()[0]['owner'], 'codex')
+        proof = dict(args, skills='none, because this is a synthetic download')
+        release = self.server.call('chat_task', proof)
+        self.assertEqual(self.server.call('chat_task', proof), release)
+        self.assertEqual(release['check'], args['check'])
+        self.server.call('chat_task', dict(action='take', id=request['id']))
+        completion = self.server.call('chat_task', dict(proof, action='done', skills='release-readiness'))
+        self.assertTrue(completion['done'])
+        self.server.call('chat_post',{'text':'agi','kind':'claim'})
+        with self.assertRaises(store.ClaimConflict):store.append_message('claude','agi/ui','claim')
+        self.server.call('chat_post',{'text':'agi','kind':'release'})
+        for i in range(5):self.assertEqual(self.server.call('chat_post',{'text':str(i)})['sender'],'codex')
         with self.assertRaises(store.GuardBlocked):self.server.call('chat_post',{'text':'over budget'})
-        self.assertTrue(self.server.call('chat_status',{})['policy']['blocked'])
+        policy = self.server.call('chat_status', {})['policy']
+        self.assertTrue(policy['blocked'])
+        self.assertEqual((policy['limit'], policy['used']), (5, 5))
+
+    def test_reply_to_another_agents_claim_reports_current_action(self):
+        request = store.append_message('user', 'Rename the repositories')
+        task_id = request['id']
+        store.take_task('claude', task_id, doing='Renaming the GitHub repositories')
+        args = dict(text=f'↪ #{task_id} I can verify the links.', request_id='a' * 32)
+        posted = self.server.call('chat_post', args)
+        self.assertEqual(posted['task_hint'], dict(id=task_id, owner='claude', doing='Renaming the GitHub repositories'))
+        self.assertNotIn('task_hint', store.read_messages(posted['id'] - 1, limit=1)[0])
+        self.assertEqual(self.server.call('chat_post', args), posted)
+        store.set_task_doing('claude', task_id, 'Verifying the old URLs')
+        updated = self.server.call('chat_post', args)
+        self.assertEqual(updated['id'], posted['id'])
+        self.assertEqual(updated['task_hint']['doing'], 'Verifying the old URLs')
+        store.release_task('claude', task_id, result='Checked the request',
+                           check='Read the fixture', skills='none, because this is a synthetic request')
+        self.assertNotIn('task_hint', self.server.call('chat_post', dict(text=f'↪ #{task_id} The links work.')))
+
+    def test_task_evidence_previews_the_claim_and_leaves_it_active(self):
+        task = store.append_message('user', 'Check a synthetic example')
+        claim = store.take_task('codex', task['id'])
+        evidence = self.server.call('chat_task_evidence', dict(id=task['id']))
+        self.assertEqual(evidence, dict(claim_id=claim['id'], skills=[], check=None))
+        self.assertEqual(store.task_claim(task['id'])['claim_id'], claim['id'])
 
     def test_validation_idempotency_and_future_ack(self):
         args={'text':'one message','request_id':'a'*32}
@@ -68,11 +116,47 @@ class MCPTests(unittest.TestCase):
             with self.subTest(name=name,args=args),self.assertRaises(ValueError):self.server.call(name,args)
         self.assertEqual(store.get_ack('codex'),0)
 
+    def test_future_commitment_is_advice_in_the_post_receipt(self):
+        request = store.append_message('user', 'Check the release')
+        candidate = f"↪ #{request['id']} Once the gate lands, I’ll check the installed build."
+        args = dict(text=candidate, request_id='b' * 32)
+        posted = self.server.call('chat_post', args)
+        self.assertEqual(posted['todo_hint'], dict(source_id=request['id'], candidate=candidate))
+        self.assertEqual(self.server.call('chat_post', args), posted)
+        self.assertNotIn('todo_hint', store.read_messages(posted['id'] - 1, limit=1)[0])
+        self.assertEqual(store.list_todos(), [])
+
+        posted = self.server.call('chat_post', {'text': "I’ll remove the Mini folder after review."})
+        self.assertEqual(posted['todo_hint']['source_id'], posted['id'])
+        candidate = "The page is live now. I’ll check the phone layout later."
+        posted = self.server.call('chat_post', {'text': candidate})
+        self.assertEqual(posted['todo_hint']['candidate'], candidate)
+
+    def test_quotes_current_work_and_proposals_are_not_commitments(self):
+        text = "\n".join([
+            "> I’ll write the report tomorrow.",
+            "```text",
+            "I’ll write the report tomorrow.",
+            "```",
+            "`I’ll write the report tomorrow.`",
+            "    I’ll write the report tomorrow.",
+            "I’ll check the file now.",
+            "I will check the log in this turn.",
+            'The message was "The page is live. I’ll check the phone layout later."',
+            'The message was “The page is live. I’ll check the phone layout later.”',
+            "I would check the package if we agree.",
+            "Next: check the package?",
+            "I checked the package.",
+        ])
+        self.assertNotIn('todo_hint', self.server.call('chat_post', {'text': text}))
+        user_post = store.append_message('user', "I’ll check it tomorrow.", with_hints=True)
+        self.assertNotIn('todo_hint', user_post)
+
     def test_cli_retry_after_mcp_post_returns_the_original_receipt(self):
         text = 'same message after losing the MCP receipt 🟣\nsecond line'
         request_id = '13' * 16
         original = self.server.call('chat_post', dict(text=text, request_id=request_id))
-        retry = subprocess.run([str(ROOT / 'bin/chat'), 'say', '--from', 'codex',
+        retry = subprocess.run([str(ROOT / 'bin/agi'), 'say', '--from', 'codex',
                                 '--request-id', request_id, text], capture_output=True,
                                text=True, check=True, timeout=10)
         receipt = json.loads(retry.stdout)
@@ -91,7 +175,7 @@ class MCPTests(unittest.TestCase):
         replies=[json.loads(line) for line in self.server.output.getvalue().splitlines()]
         self.assertEqual([r.get('error',{}).get('code') for r in replies[:2]],[-32700,-32002])
         self.assertEqual(replies[2]['result']['protocolVersion'],'2025-11-25')
-        self.assertEqual(len(replies[3]['result']['tools']),5)
+        self.assertEqual({tool['name'] for tool in replies[3]['result']['tools']}, TOOL_NAMES)
         self.assertEqual(replies[4]['error']['code'],-32602)
         self.assertTrue(replies[5]['result']['isError'])
         self.assertEqual(replies[6]['result'],{})
@@ -136,7 +220,7 @@ class MCPTests(unittest.TestCase):
 
     def test_real_stdio_process_only_emits_protocol_and_exits_on_eof(self):
         env=dict(os.environ,PYTHONPATH=str(ROOT),PYTHONDONTWRITEBYTECODE='1')
-        proc=subprocess.Popen([sys.executable,'-P','-m','agentchat.codex_mcp','--as','codex'],cwd=self.temp.name,env=env,
+        proc=subprocess.Popen([sys.executable,'-P','-m','agi.codex_mcp','--as','codex'],cwd=self.temp.name,env=env,
                               stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
         def request(ident,method,params):
             proc.stdin.write(json.dumps(dict(jsonrpc='2.0',id=ident,method=method,params=params))+'\n');proc.stdin.flush()
@@ -144,7 +228,7 @@ class MCPTests(unittest.TestCase):
             reply=json.loads(proc.stdout.readline());self.assertEqual(reply['id'],ident);return reply['result']
         try:
             request(1,'initialize',{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'fixture','version':'1'}})
-            self.assertEqual(len(request(2,'tools/list',{})['tools']),5)
+            self.assertEqual({tool['name'] for tool in request(2,'tools/list',{})['tools']}, TOOL_NAMES)
             result=request(3,'tools/call',{'name':'chat_post','arguments':{'text':'stdio\nexact'}})
             self.assertFalse(result['isError']);self.assertEqual(json.loads(result['content'][0]['text'])['sender'],'codex');self.assertEqual(store.read_messages()[-1]['text'],'stdio\nexact')
             proc.stdin.close();self.assertEqual(proc.wait(5),0)
