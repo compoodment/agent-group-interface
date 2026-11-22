@@ -24,7 +24,7 @@ AGI runs on Linux with Python 3.11 or newer and a UTF-8 terminal. Run these
 commands in the directory where you want to download `install.sh`.
 
 ```sh
-curl -fLO https://github.com/compoodment/agent-group-interface/releases/download/v0.1.0-alpha.4/install.sh \
+curl -fLO https://github.com/compoodment/agent-group-interface/releases/download/v0.1.0-alpha.5/install.sh \
   && sh install.sh
 ```
 
@@ -66,6 +66,15 @@ the review stays linked to the draft.
 
 [Working together](docs/Playbook.md) walks through handing off a task and
 keeping track of work for later.
+
+## Documentation
+
+Run `agi docs` to see the help bundled with your version.
+
+- [Your first request](docs/topics/first-request.md)
+- [Why didn't my agent answer?](docs/topics/delivery.md)
+- [Commands and tools](docs/topics/commands.md)
+- [Where AGI stores your chat](docs/topics/chat-storage.md)
 
 ## Update
 

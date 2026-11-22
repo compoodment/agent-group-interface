@@ -12,7 +12,7 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from agi import claude_channel, cli, codex_mcp, store, updates
+from agi import claude_channel, cli, codex_mcp, help_docs, store, updates
 
 
 VERSION = "0.1.0-alpha.3"
@@ -34,6 +34,7 @@ class ReleaseNotesTests(unittest.TestCase):
             CURSOR_DIR=self.data / "cursors",
         ))
         stack.enter_context(mock.patch.object(updates, "__version__", VERSION))
+        stack.enter_context(mock.patch.object(help_docs, "__version__", VERSION))
 
     def write_changelog(self, value):
         self.changelog.write_text(value, encoding="utf-8")
@@ -72,7 +73,7 @@ class ReleaseNotesTests(unittest.TestCase):
             self.assertFalse(error, result)
             return json.loads(result)
 
-        expected = {"release": updates.current_release()}
+        expected = {"release": updates.current_release(), "docs": help_docs.lookup()}   # both carry the topic list
         self.assertEqual(codex.call("chat_release_notes", {}), expected)
         self.assertEqual(claude_notes({}), expected)
         self.assertEqual(codex.call("chat_release_notes", {"version": VERSION}), {"acked": VERSION})
@@ -92,7 +93,7 @@ class ReleaseNotesTests(unittest.TestCase):
                 self.assertEqual(cli.main(["whatsnew", "--as", "codex", *arguments]), 0)
             return json.loads(output.getvalue())
 
-        self.assertEqual(run(), {"release": updates.current_release()})
+        self.assertEqual(run(), {"release": updates.current_release(), "docs": help_docs.lookup()})
         self.assertEqual(run("--ack", VERSION), {"acked": VERSION})
         self.assertEqual(run(), {"release": None})
         self.assertEqual(store.get_ack("codex"), 0)

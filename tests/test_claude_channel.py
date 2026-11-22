@@ -92,6 +92,27 @@ class ChannelTest(unittest.TestCase):
             if message is None or message.get("method") == "notifications/claude/channel":
                 return message
 
+    def test_chat_help_lists_the_installed_topics_and_reads_one(self):
+        from agi import __version__, help_docs
+        reply = self.start(join=False)
+        self.assertIn("chat_help", reply["result"]["instructions"])
+        listing = self.call("chat_help")
+        self.assertTrue(listing.startswith(f"AGI {__version__} docs"))
+        topics = [item["topic"] for item in help_docs.lookup()["topics"]]
+        self.assertTrue(topics)
+        for topic in topics:
+            self.assertIn(f"- {topic}: ", listing)
+        page = self.call("chat_help", topic=topics[0])
+        self.assertTrue(page.startswith(f"AGI {__version__} · {topics[0]}\n\n# "))
+        result = self.request("tools/call", {"name": "chat_help", "arguments": {"topic": "../README"}})["result"]
+        self.assertTrue(result.get("isError"))
+        self.assertIn("Unknown AGI docs topic", result["content"][0]["text"])
+
+    def test_the_handshake_names_the_running_release(self):
+        from agi import __version__
+        reply = self.start(join=False)
+        self.assertEqual(reply["result"]["serverInfo"], {"name": "agi", "version": __version__})
+
     def test_initialize_and_tools(self):
         self.proc.stdin.buffer.write(b"\xff\n")
         self.proc.stdin.flush()
@@ -101,7 +122,7 @@ class ChannelTest(unittest.TestCase):
         self.assertIn("tools", result["capabilities"])
         self.assertEqual(result["protocolVersion"], "2025-06-18")
         names = {t["name"] for t in self.request("tools/list")["result"]["tools"]}
-        self.assertEqual(names, {"chat_reply", "chat_ack", "chat_release_notes", "chat_take", "chat_doing", "chat_done",
+        self.assertEqual(names, {"chat_reply", "chat_ack", "chat_release_notes", "chat_help", "chat_take", "chat_doing", "chat_done",
                                  "chat_read", "chat_join", "chat_leave", "chat_confirm_delivery", "chat_evidence"})
         self.assertEqual(self.request("ping")["result"], {})
 
@@ -137,8 +158,9 @@ class ChannelTest(unittest.TestCase):
         boot()
         self.start()
         self.assertEqual(membership.status("claude")["session"], conversation)
-        self.proc.stdin.close()                                         # the laptop goes down
+        self.proc.stdin.close()
         self.proc.wait(5)
+        self.proc.stdout.close()
         boot()
         self.start(join=False)                                          # nobody says "join" after the reboot
         self.store.append_message("user", "@claude back after the reboot?")

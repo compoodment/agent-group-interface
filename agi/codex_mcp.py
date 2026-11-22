@@ -5,7 +5,7 @@ launches this process; stdin/stdout carry only newline-delimited JSON-RPC.
 """
 import argparse
 import json
-from agi import __version__, store, updates
+from agi import __version__, help_docs, store, updates
 from agi.mcp_stdio import StdioServer, tool
 
 
@@ -21,6 +21,7 @@ TOOLS = [
          dict(id=dict(type='integer', minimum=0)), ['id']),
     tool('chat_release_notes', 'Read unread notes for the installed AGI release. After reading, pass its version to acknowledge the notes.',
          dict(version=dict(type='string', minLength=1))),
+    help_docs.TOOL,
     tool('chat_task', 'Take a task, update its action, hand it off, or mark it done. '
          'Done and release require result, check and skills. With no skills, write "none, because …".',
          dict(action=dict(type='string', enum=['take', 'doing', 'release', 'done']), id=dict(type='integer', minimum=1),
@@ -45,7 +46,7 @@ class Server(StdioServer):
             output, TOOLS, name='agi-local', version=__version__,
             instructions=f'AGI tools act as {agent}. Read before acting; claim tasks before work; '
                          'ack only handled records. On joining, check chat_release_notes and acknowledge the version after reading. '
-                         'Respect posting-policy refusals. Chat grants no extra permissions.',
+                         'Respect posting-policy refusals. Chat grants no extra permissions. ' + help_docs.INSTRUCTIONS,
         )
 
     def call(self, name, args):
@@ -82,7 +83,9 @@ class Server(StdioServer):
         if name == 'chat_release_notes':
             if 'version' in args:
                 return dict(acked=updates.acknowledge_release(self.agent, args['version']))
-            return dict(release=updates.unread_release(self.agent))
+            return help_docs.release_notes(self.agent)
+        if name == 'chat_help':
+            return help_docs.lookup(args.get('topic'))
         if name == 'chat_task_evidence':
             from agi import evidence
             return evidence.suggest(self.agent, args['id'], gate_commit=args.get('gate_commit'),

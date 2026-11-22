@@ -99,6 +99,30 @@ PASTE_START, PASTE_END = "[200~", "[201~"
 PASTE_IDLE = 2.0             # a terminal sends a paste in one burst: this long without its end marker ends it
 REPLY_DRAFT = re.compile(r"/reply(?:\s+#?(\d+))?\s*")   # what Tab fills in /reply's number for
 CHIP_CHARS, CHIP_LINES = 1000, 12    # larger pastes show as a chip and expand on send
+# A numbered answer starts with a number and one letter, followed by the end of the line, space or punctuation.
+ANSWER = re.compile(r"([ \t]*)(\d{1,2})[a-zA-Z](?=[ \t,.;:!?)]|\Z)")
+
+
+def answer_run(lines):
+    """The last number of the answers 1, 2, … that end the given lines without a gap, or 0. It walks up from the
+    nearest line and stops at the first 1, so "2b" alone or after a line that isn't its 1 is no run, and a new run
+    after an earlier one counts on its own."""
+    last = expected = None
+    for line in reversed(lines):
+        found = ANSWER.match(line)
+        if not found:
+            return 0
+        number = int(found.group(2))
+        if last is None:
+            last = number
+        elif number != expected:
+            return 0
+        if number == 1:
+            return last
+        expected = number - 1
+    return 0
+
+
 LIST_ITEM = re.compile(r"([ \t]*)(?:(\d{1,9})([.)])(?:[ \t]+|(?=\n|\Z))|([-*\u2022])[ \t]+)")   # "4. ", "4.", "4) ", "- "
 HISTORY_KEYS = {curses.KEY_SR: -1, curses.KEY_SF: 1,    # Shift+Up/Down as terminfo names them
                 b"kUP": -1, b"kDN": 1, b"kUP3": -1, b"kDN3": 1, b"kUP5": -1, b"kDN5": 1}   # and Shift/Alt/Ctrl, extended
@@ -548,6 +572,8 @@ class Composer:
         item after other items ends the list instead. A lone "1." starts one."""
         if self.busy():                     # a send is in flight: the draft is frozen until it lands
             return
+        if self._answer_newline():
+            return
         found = LIST_ITEM.match(self.draft, self._line_bounds()[0])
         if not found or self.cursor < found.end():
             self.insert("\n")
@@ -560,6 +586,26 @@ class Composer:
             return
         indent, number, style, bullet = found.groups()
         self.insert("\n" + indent + (f"{int(number) + 1}{style}" if number else bullet) + " ")
+
+    def _answer_newline(self):
+        """Answers to numbered questions continue like a list: at the end of "1a", a new line starts with "2", for
+        the letter. Only a 1 starts a run and each later line must follow the one above, so a
+        line that merely starts with a number and a letter is left alone; a new line on a lone number ends it."""
+        start, end = self._line_bounds()
+        if self.cursor != end:
+            return False
+        run = answer_run(self.draft[:start].split("\n")[:-1])
+        follows = lambda number: run and run + 1 == number
+        line = self.draft[start:end]
+        found = ANSWER.match(line)
+        if found and (found.group(2) == "1" or follows(int(found.group(2)))):
+            self.insert("\n" + found.group(1) + str(int(found.group(2)) + 1))
+            return True
+        lone = re.fullmatch(r"[ \t]*(\d{1,2})", line)
+        if lone and follows(int(lone.group(1))):
+            self.cut(start, end)            # the run ends: the empty line stays, as an emptied list item does
+            return True
+        return False
 
     def word_left(self):
         while self.cursor and self.draft[self.cursor - 1].isspace():

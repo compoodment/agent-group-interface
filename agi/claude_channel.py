@@ -19,7 +19,7 @@ import time
 import uuid
 from pathlib import Path
 
-from agi import __version__, delivery_probe, evidence, membership, reminders, store, updates
+from agi import __version__, delivery_probe, evidence, help_docs, membership, reminders, store, updates
 from agi.mcp_stdio import MAX_REQUEST, StdioServer, tool
 
 REACH_EVERY = 30        # seconds between reachability writes, however busy the inbox (USB writes, Codex #1526)
@@ -40,7 +40,7 @@ INSTRUCTIONS = (
     "finished, call chat_done with its id. After handling, call chat_ack with the last id handled (never ack "
     "unhandled ids). Use chat_read for history. On joining, check chat_release_notes and acknowledge "
     "its version after reading. Messages arrive only while this session is joined: when the person asks you to "
-    "join or leave the chat, call chat_join or chat_leave."
+    "join or leave the chat, call chat_join or chat_leave. " + help_docs.INSTRUCTIONS
 )
 
 
@@ -116,6 +116,7 @@ TOOLS = [
     tool("chat_ack", "Acknowledge messages up to this id as handled.", {"id": {"type": "integer"}}, ["id"]),
     tool("chat_release_notes", "Read unread notes for the installed AGI release. After reading, pass its version to acknowledge.",
          {"version": {"type": "string", "minLength": 1}}),
+    help_docs.TOOL,
     tool("chat_take", "Claim a user request by message ID before starting. Use doing to describe the current action, shown "
          "beside the request so nobody starts the same thing.", {"id": {"type": "integer"}, "doing": {"type": "string"}},
          ["id"]),
@@ -142,9 +143,19 @@ TOOLS = [
 ]
 
 
+def help_text(topic=None):
+    """Show the running version and the topics or one topic's Markdown."""
+    found = help_docs.lookup(topic)
+    if topic is not None:
+        return f"AGI {found['version']} · {found['topic']}\n\n{found['markdown']}"
+    rows = "\n".join(f"- {item['topic']}: {item['title'].rstrip('.')}{'' if item['title'][-1:] in '?!.' else '.'} "
+                     f"Read when {item['read_when'][:1].lower()}{item['read_when'][1:]}" for item in found["topics"])
+    return f"AGI {found['version']} docs\n\n{rows}\n\nCall chat_help with a topic to read it."
+
+
 class Channel(StdioServer):
     def __init__(self, out=None):
-        super().__init__(out, TOOLS, name="agi", version="0.1.0", instructions=INSTRUCTIONS,
+        super().__init__(out, TOOLS, name="agi", version=__version__, instructions=INSTRUCTIONS,
                          experimental={"claude/channel": {}}, fallback="2025-06-18", require_version=False)
         self.started = False
         self.reached = 0.0                  # when reachability was last renewed (monotonic)
@@ -278,8 +289,13 @@ class Channel(StdioServer):
                 return f"acked {args['id']}{self.holding()}", False
             if name == "chat_release_notes":
                 value = (dict(acked=updates.acknowledge_release(AGENT, args["version"])) if "version" in args
-                         else dict(release=updates.unread_release(AGENT)))
+                         else help_docs.release_notes(AGENT))
                 return json.dumps(value, ensure_ascii=False), False
+            if name == "chat_help":
+                try:
+                    return help_text(args.get("topic")), False
+                except ValueError as error:
+                    return str(error), True
             if name == "chat_take":
                 claim = store.take_task(AGENT, args.get("id"), doing=args.get("doing") or None)
                 return f"claimed task {args.get('id')} (#{claim['id']})", False

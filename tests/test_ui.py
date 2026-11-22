@@ -957,6 +957,39 @@ class DraftEditingTests(unittest.TestCase):
             screen.newline()
             self.assertEqual((screen.draft, screen.cursor), (expected, len(expected)))
 
+    def test_a_new_line_after_an_answer_starts_the_next_number(self):
+        # Shift+Enter prepares the number for the next choice.
+        for text, expected in (("1a", "1a\n2"), ("1b but bluer", "1b but bluer\n2"), ("1a\n2c", "1a\n2c\n3"),
+                               ("notes\n1A.", "notes\n1A.\n2"), ("  1a", "  1a\n  2")):
+            for press in (lambda s: s.key("\n"), lambda s: s.alt_keys()["\r"](), lambda s: s.newline()):
+                screen = self.typed(text)
+                press(screen)
+                self.assertEqual((screen.draft, screen.cursor), (expected, len(expected)), text)
+        screen = self.typed("1a")
+        for keys in ("\n", "b", "\n", "c", "\n"):
+            screen.newline() if keys == "\n" else screen.insert(keys)
+        self.assertEqual(screen.draft, "1a\n2b\n3c\n4")
+        for text, expected in (("1a\n2b", "1a\n2b\n3"), ("2b\n1a", "2b\n1a\n2"), ("notes\n1a\n2b\n3c", "notes\n1a\n2b\n3c\n4"),
+                               ("1a\n2b\n1c\n2a", "1a\n2b\n1c\n2a\n3")):          # a second run
+            screen = self.typed(text)
+            screen.newline()
+            self.assertEqual(screen.draft, expected, text)
+
+    def test_a_new_line_on_a_lone_next_number_ends_the_answers(self):
+        screen = self.typed("1a\n2b\n3")
+        screen.newline()
+        self.assertEqual((screen.draft, screen.cursor), ("1a\n2b\n", 6))
+
+    def test_words_that_start_with_a_number_and_a_letter_are_not_answers(self):
+        for text in ("3d printing", "2b", "1am", "1st", "12ab", "see 1a", "1a\n3b", "2b\n3d printing",
+                     "1a\n3b\n4c", "1a\nnotes\n2b"):
+            screen = self.typed(text)
+            screen.newline()
+            self.assertEqual(screen.draft, text + "\n", text)
+        screen = self.typed("1a", cursor=1)                          # not at the end of the line
+        screen.newline()
+        self.assertEqual(screen.draft, "1\na")
+
     def test_a_new_line_elsewhere_is_plain(self):
         for text, cursor in (("4.5 apples", None), ("-5 degrees", None), ("*bold*", None), ("4. four", 1)):
             screen = self.typed(text, cursor)
@@ -2938,12 +2971,14 @@ class ChatScreenTests(ScreenCase):
         self.screen = screen = ChatScreen(self.data, background="ffff/ffff/ffff")
         screen.type("hello\r")
         self.assertTrue(screen.until(lambda: b"48;5;254" in screen.raw))   # light band behind your message
+        self.assertIn(b"38;5;28", screen.raw)
         self.assertNotIn(b"48;5;236", screen.raw)
 
     def test_dark_terminal_gets_the_dark_palette(self):
         self.screen = screen = ChatScreen(self.data, background="1616/1616/1d1d")
         screen.type("hello\r")
         self.assertTrue(screen.until(lambda: b"48;5;236" in screen.raw))
+        self.assertIn(b"38;5;157", screen.raw)
 
     def test_late_colour_reply_never_reaches_the_draft(self):
         screen = self.open()

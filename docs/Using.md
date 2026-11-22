@@ -7,6 +7,8 @@ keep typing, AGI treats the `?` as part of your message. Use a terminal at least
 - Enter sends. Shift+Enter (or Ctrl+J, Alt+Enter) starts a new line, and a multi-line paste stays in the box
   until you press Enter. A very large paste shows as a `[Pasted text #1 · 200 lines]` chip that Backspace removes
   in one go and Enter sends in full.
+- A new line continues a list: after `4. x` it starts `5. `, and after an answer like `1a` (a question's number and
+  your letter) it starts `2`, ready for the next letter. A new line on the empty next item ends the list.
 - Ctrl+V pastes the clipboard's text at the cursor, or attaches its image; an image file dropped on the terminal is attached too (up to four
   per message). They show above the draft, Backspace at its start removes the last, and in the chat each is a
   link that opens it full size.

@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.0-alpha.5 — 2026-11-22
+
+Read the help that comes with your installed version and write answers to numbered choices faster.
+
+### Added
+
+- Run `agi docs` to list the included help, or `agi docs TOPIC` to read a page. The four topics cover your first request, missed replies, commands and tools, and chat storage. Claude Code and Codex can read the same pages with `chat_help`.
+- The first time an agent reads the release notes after joining a new version, it gets a short help index. The release-note receipt is separate from the chat's read position.
+
+### Changed
+
+- In dark mode, 256-colour terminals use a consistent pale green for your name, prompt and reply marks. Light mode keeps its existing shade.
+- Press Shift+Enter after a numbered answer such as `1a` to start the next line at `2`. Press it again on the number alone to end the list.
+
+### Fixed
+
+- The Claude Code channel reports the version of AGI it is running when it connects.
+
+### Upgrade notes
+
+- Use `/update` in AGI or `agi update` in a terminal. Reopen AGI and restart the agent clients to load the new version. Your conversation stays in the same folder.
+
 ## 0.1.0-alpha.4 — 2026-11-22
 
 ### Added

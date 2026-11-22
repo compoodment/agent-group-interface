@@ -147,7 +147,7 @@ class Screen(Renderer, Composer):
         curses.use_default_colors()
         rich = curses.COLORS >= 256
         light = os.environ.get("AGI_THEME") == "light"   # set by app.detect_theme() unless the user chose
-        palette = {"user": 28 if rich and light else curses.COLOR_GREEN,
+        palette = {"user": (28 if light else 157) if rich else curses.COLOR_GREEN,
                    "claude": (166 if light else 173) if rich else curses.COLOR_YELLOW,
                    # The brand's blue is #6a86f2 on dark and #1f5ae6 on light, approximated in 256 colours.
                    "codex": (26 if light else 69) if rich else curses.COLOR_BLUE,

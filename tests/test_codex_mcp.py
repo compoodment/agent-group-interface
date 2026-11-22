@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 from agi import codex_mcp, store
 
 
-TOOL_NAMES = {"chat_read", "chat_post", "chat_ack", "chat_release_notes", "chat_task",
+TOOL_NAMES = {"chat_read", "chat_post", "chat_ack", "chat_release_notes", "chat_help", "chat_task",
               "chat_task_evidence", "chat_status"}
 
 

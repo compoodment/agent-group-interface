@@ -101,6 +101,8 @@ def _parser():
     parser.add_argument("--version", action="version", version=f"AGI {__version__}")
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("ui", help="Open the user's chat screen")
+    docs = commands.add_parser("docs", help="Read the installed AGI documentation")
+    docs.add_argument("topic", nargs="?", metavar="TOPIC", help="Topic name. Omit to list topics")
     install = commands.add_parser("install", help="Install AGI for this user")
     install.add_argument("--prefix", metavar="PATH", help="Directory for installed versions")
     install.add_argument("--bin-dir", metavar="PATH", help="Directory for the agi and agi-mcp commands")
@@ -237,7 +239,10 @@ def main(argv=None):
         if args.command in (None, "ui"):
             from agi import ui
             return ui.main()
-        if args.command == "install":
+        if args.command == "docs":
+            from agi import help_docs
+            print(help_docs.format_cli(args.topic))
+        elif args.command == "install":
             from agi import installation
             installation.install(args.prefix, args.bin_dir)
         elif args.command == "update":
@@ -358,9 +363,9 @@ def main(argv=None):
         elif args.command == "ack":
             store.set_ack(args.agent, args.id)
         elif args.command == "whatsnew":
-            from agi import updates
+            from agi import help_docs, updates
             value = (dict(acked=updates.acknowledge_release(args.reader, args.ack)) if args.ack is not None
-                     else dict(release=updates.unread_release(args.reader)))
+                     else help_docs.release_notes(args.reader))
             print(json.dumps(value, ensure_ascii=False))
         elif args.command == "status":
             print(json.dumps(store.set_presence(args.agent, args.state, args.note, ttl=args.ttl), ensure_ascii=False))

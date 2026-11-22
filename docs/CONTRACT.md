@@ -212,7 +212,21 @@ agi remind --as <agent> <id> --after-gate PROJECT SHA [--note TEXT] [--request-i
                              remind the task owner when that exact commit reaches main
 agi cancel-reminder --as <agent> <id> [--request-id 32HEX]
                              cancel that task's reminder or target a specific reminder ID
+agi docs [TOPIC]             list installed documentation topics or read one topic as Markdown
 ```
+
+## Installed documentation
+
+`agi docs` and the native `chat_help` tool read `docs/topics/` in the running package. The tool takes an
+optional `topic` argument. With no topic it returns an object with `version` and `topics`. Each topic has
+`topic`, `title`, `summary` and `read_when` fields. With a topic it returns `version`, those four fields and
+`markdown`. Topic names are the slugs of the bundled Markdown files. Only those names can be read, and
+an unknown name tells the reader how to list available topics. Lookup never reads or changes the chat.
+
+A topic file starts with `summary` and `read_when` in its front matter and then a Markdown heading. The
+release ships these same public files. Both integrations point to `chat_help` in their instructions. When
+an agent first checks unread release notes for a version, the notes response also includes the topic list
+as `docs`. Acknowledging those notes keeps the existing release receipt and leaves the chat cursor alone.
 
 ## Task reminders
 
